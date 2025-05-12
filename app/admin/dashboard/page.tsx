@@ -1,173 +1,124 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
-import { Building, Users, LogOut } from "lucide-react"
+import type { Metadata } from "next"
 import Link from "next/link"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Building, Users, FileText, Settings } from "lucide-react"
 
-export default function AdminDashboard() {
-  const [user, setUser] = useState(null)
-  const [stats, setStats] = useState({
-    companies: 0,
-    admins: 0,
-  })
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const supabase = createClientComponentClient()
-  const { toast } = useToast()
+export const metadata: Metadata = {
+  title: "Admin Dashboard | Payroll System",
+  description: "Super admin dashboard for the payroll system",
+}
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        // Check if user is logged in
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!session) {
-          router.push("/")
-          return
-        }
-
-        // Get user info
-        const { data: userData, error: userError } = await supabase
-          .from("admin_users")
-          .select("*")
-          .eq("email", session.user.email)
-          .single()
-
-        if (userError || !userData || !userData.is_super_admin) {
-          toast({
-            title: "Access denied",
-            description: "Only super administrators can access this area",
-            variant: "destructive",
-          })
-          await supabase.auth.signOut()
-          router.push("/")
-          return
-        }
-
-        setUser(userData)
-
-        // Get stats
-        const { data: companies, error: companiesError } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("active", true)
-
-        const { data: admins, error: adminsError } = await supabase
-          .from("admin_users")
-          .select("id")
-          .eq("is_active", true)
-
-        setStats({
-          companies: companies?.length || 0,
-          admins: admins?.length || 0,
-        })
-      } catch (error) {
-        console.error("Error loading dashboard:", error)
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadDashboard()
-  }, [router, supabase, toast])
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/")
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>Loading dashboard...</p>
-      </div>
-    )
+export default function AdminDashboardPage() {
+  // Mock data for the dashboard
+  const stats = {
+    companies: 3,
+    adminUsers: 4,
+    employees: 11,
+    payslips: 6,
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">Super Admin Dashboard</h1>
-            <p className="text-sm text-gray-500">
-              Welcome, {user.first_name} {user.last_name}
+    <div className="container mx-auto py-6">
+      <h1 className="text-3xl font-bold mb-6">Super Admin Dashboard</h1>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Companies</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.companies}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Admin Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.adminUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.employees}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Payslips</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.payslips}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Manage Companies</CardTitle>
+            <CardDescription>Add, edit, and manage companies in the system.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Building className="h-12 w-12 text-primary mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Create and manage companies, assign admins, and configure company settings.
             </p>
-          </div>
-          <Button variant="outline" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Companies</CardTitle>
-              <Building className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.companies}</div>
-              <p className="text-xs text-muted-foreground">Total active companies</p>
-              <Button asChild className="w-full mt-4" variant="outline" size="sm">
-                <Link href="/admin/companies">Manage Companies</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Administrators</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.admins}</div>
-              <p className="text-xs text-muted-foreground">Total active administrators</p>
-              <Button asChild className="w-full mt-4" variant="outline" size="sm">
-                <Link href="/admin/users">Manage Administrators</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full">
+              <Link href="/admin/companies">Manage Companies</Link>
+            </Button>
+          </CardFooter>
+        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks for system administration</CardDescription>
+            <CardTitle>Manage Users</CardTitle>
+            <CardDescription>Add, edit, and manage admin users.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button asChild variant="outline">
-              <Link href="/admin/companies/new">
-                <Building className="h-4 w-4 mr-2" />
-                Add New Company
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/admin/users/new">
-                <Users className="h-4 w-4 mr-2" />
-                Add New Administrator
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/admin/settings">Settings</Link>
-            </Button>
+          <CardContent>
+            <Users className="h-12 w-12 text-primary mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Create and manage super admins and company admins with different access levels.
+            </p>
           </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full">
+              <Link href="/admin/users">Manage Users</Link>
+            </Button>
+          </CardFooter>
         </Card>
-      </main>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>System Settings</CardTitle>
+            <CardDescription>Configure system-wide settings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Settings className="h-12 w-12 text-primary mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Configure global settings, security options, and system preferences.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full">
+              <Link href="/admin/settings">System Settings</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   )
 }
