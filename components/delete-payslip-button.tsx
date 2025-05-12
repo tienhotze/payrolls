@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
-import { deletePayslip } from "@/app/actions/delete-payslip"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -14,77 +15,76 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "@/components/ui/use-toast"
 
 interface DeletePayslipButtonProps {
-  payslipId: number
+  payslipId: string | number
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  size?: "default" | "sm" | "lg" | "icon"
+  className?: string
 }
 
-export function DeletePayslipButton({ payslipId }: DeletePayslipButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function DeletePayslipButton({
+  payslipId,
+  variant = "ghost",
+  size = "icon",
+  className = "",
+}: DeletePayslipButtonProps) {
+  const [open, setOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { toast } = useToast()
+  const router = useRouter()
 
-  async function handleDelete() {
+  const handleDelete = async () => {
     setIsDeleting(true)
-
     try {
-      const result = await deletePayslip(payslipId)
+      const supabase = getSupabaseClient()
 
-      if (result.success) {
-        toast({
-          title: "Payslip deleted",
-          description: "The payslip has been deleted successfully.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to delete payslip. Please try again.",
-          variant: "destructive",
-        })
+      // Delete related work schedules
+      await supabase.from("daily_work_schedules").delete().eq("payslip_id", payslipId)
+
+      // Delete the payslip
+      const { error } = await supabase.from("payslips").delete().eq("id", payslipId)
+
+      if (error) {
+        throw error
       }
+
+      toast({
+        title: "Payslip deleted",
+        description: "The payslip has been successfully deleted.",
+      })
+
+      router.refresh()
     } catch (error) {
+      console.error("Error deleting payslip:", error)
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: "Failed to delete payslip. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsDeleting(false)
-      setIsOpen(false)
+      setOpen(false)
     }
   }
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsOpen(true)}
-        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-      >
+      <Button variant={variant} size={size} className={className} onClick={() => setOpen(true)} disabled={isDeleting}>
         <Trash2 className="h-4 w-4" />
         <span className="sr-only">Delete payslip</span>
       </Button>
-
-      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to delete this payslip?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the payslip and remove it from our servers.
+              This action cannot be undone. This will permanently delete the payslip and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                handleDelete()
-              }}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-            >
+            <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
               {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>

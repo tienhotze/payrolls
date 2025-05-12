@@ -1,8 +1,11 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -14,92 +17,90 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useToast } from "@/components/ui/use-toast"
-import { getSupabaseClient } from "@/lib/supabase/client"
+import { toast } from "@/components/ui/use-toast"
 
 interface DeleteEmployeeButtonProps {
   employeeId: string | number
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost"
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  size?: "default" | "sm" | "lg" | "icon"
   className?: string
   showIcon?: boolean
   redirectTo?: string
+  children?: React.ReactNode
 }
 
 export function DeleteEmployeeButton({
   employeeId,
   variant = "ghost",
-  className,
-  showIcon = false,
+  size = "icon",
+  className = "",
+  showIcon = true,
   redirectTo,
+  children,
 }: DeleteEmployeeButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { toast } = useToast()
   const router = useRouter()
 
-  async function handleDelete() {
+  const handleDelete = async () => {
     setIsDeleting(true)
-
     try {
       const supabase = getSupabaseClient()
 
-      // Delete the employee
+      // First delete related records
+      await supabase.from("payslips").delete().eq("employee_id", employeeId)
+      await supabase.from("work_records").delete().eq("employee_id", employeeId)
+      await supabase.from("daily_work_schedules").delete().eq("employee_id", employeeId)
+
+      // Then delete the employee
       const { error } = await supabase.from("employees").delete().eq("id", employeeId)
 
       if (error) {
-        throw new Error(`Failed to delete employee: ${error.message}`)
+        throw error
       }
 
       toast({
         title: "Employee deleted",
-        description: "The employee has been deleted successfully.",
+        description: "The employee has been successfully deleted.",
       })
 
       if (redirectTo) {
         router.push(redirectTo)
+      } else {
+        router.refresh()
       }
-      router.refresh()
     } catch (error) {
       console.error("Error deleting employee:", error)
       toast({
         title: "Error",
-        description: (error as Error).message || "Failed to delete employee. Please try again.",
+        description: "Failed to delete employee. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsDeleting(false)
-      setIsOpen(false)
+      setOpen(false)
     }
   }
 
   return (
     <>
-      <Button variant={variant} size="icon" onClick={() => setIsOpen(true)} className={className} disabled={isDeleting}>
-        {showIcon && <Trash2 className="h-4 w-4 mr-2" />}
-        {!showIcon && <Trash2 className="h-4 w-4" />}
-        <span className="sr-only">Delete employee</span>
-        {variant === "destructive" && showIcon && "Delete Employee"}
+      <Button variant={variant} size={size} className={className} onClick={() => setOpen(true)} disabled={isDeleting}>
+        {showIcon && <Trash2 className={children ? "mr-2 h-4 w-4" : "h-4 w-4"} />}
+        {children}
+        {!children && <span className="sr-only">Delete employee</span>}
       </Button>
-
-      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to delete this employee?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the employee and all associated data from our
-              servers.
+              This action cannot be undone. This will permanently delete the employee and all associated payslips and
+              work records.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                handleDelete()
-              }}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-            >
+            <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
               {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
