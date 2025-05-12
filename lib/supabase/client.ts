@@ -9,6 +9,17 @@ let supabase: ReturnType<typeof createClient> | null = null
 
 export const getSupabaseClient = () => {
   if (!supabase) {
+    // Check if we're in a Vercel environment
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.warn("Supabase credentials missing. Using fallback client.")
+      // Return a minimal client that won't throw errors
+      return createClient("https://placeholder-url.supabase.co", "placeholder-key", {
+        auth: {
+          persistSession: false,
+        },
+      })
+    }
+
     supabase = createClient(supabaseUrl, supabaseAnonKey)
   }
   return supabase
